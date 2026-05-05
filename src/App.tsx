@@ -9,8 +9,9 @@ type Position =
   | 'center'
 
 type ColorMode = 'original' | 'custom'
+type WatermarkMode = 'single' | 'pattern'
 
-type LoadedAsset = {
+type LoadedImageAsset = {
   file: File
   url: string
   image: HTMLImageElement | null
@@ -24,7 +25,7 @@ const positions: Array<{ value: Position; label: string }> = [
   { value: 'center', label: 'Centro' },
 ]
 
-const createAsset = (file: File): LoadedAsset => ({
+const createImageAsset = (file: File): LoadedImageAsset => ({
   file,
   url: URL.createObjectURL(file),
   image: null,
@@ -101,6 +102,7 @@ const getWatermarkPlacement = (
 }
 
 const renderWatermark = ({
+  angleDegrees = 0,
   colorMode,
   context,
   height,
@@ -111,6 +113,7 @@ const renderWatermark = ({
   x,
   y,
 }: {
+  angleDegrees?: number
   colorMode: ColorMode
   context: CanvasRenderingContext2D
   height: number
@@ -123,6 +126,8 @@ const renderWatermark = ({
 }) => {
   context.save()
   context.globalAlpha = opacityPercent / 100
+  context.translate(x + width / 2, y + height / 2)
+  context.rotate((angleDegrees * Math.PI) / 180)
 
   if (colorMode === 'custom') {
     const tintCanvas = document.createElement('canvas')
@@ -131,7 +136,7 @@ const renderWatermark = ({
     const tintContext = tintCanvas.getContext('2d')
 
     if (!tintContext) {
-      context.drawImage(watermarkImage, x, y, width, height)
+      context.drawImage(watermarkImage, -width / 2, -height / 2, width, height)
       context.restore()
       return
     }
@@ -140,36 +145,100 @@ const renderWatermark = ({
     tintContext.globalCompositeOperation = 'source-in'
     tintContext.fillStyle = watermarkColor
     tintContext.fillRect(0, 0, width, height)
-    context.drawImage(tintCanvas, x, y)
+    context.drawImage(tintCanvas, -width / 2, -height / 2)
   } else {
-    context.drawImage(watermarkImage, x, y, width, height)
+    context.drawImage(watermarkImage, -width / 2, -height / 2, width, height)
   }
 
   context.restore()
 }
 
+const renderWatermarkPattern = ({
+  angleDegrees,
+  colorMode,
+  context,
+  gapXPercent,
+  gapYPercent,
+  opacityPercent,
+  outputHeight,
+  outputWidth,
+  targetHeight,
+  targetWidth,
+  watermarkColor,
+  watermarkImage,
+}: {
+  angleDegrees: number
+  colorMode: ColorMode
+  context: CanvasRenderingContext2D
+  gapXPercent: number
+  gapYPercent: number
+  opacityPercent: number
+  outputHeight: number
+  outputWidth: number
+  targetHeight: number
+  targetWidth: number
+  watermarkColor: string
+  watermarkImage: HTMLImageElement
+}) => {
+  const baseMeasure = Math.min(outputWidth, outputHeight)
+  const gapX = Math.round((baseMeasure * gapXPercent) / 100)
+  const gapY = Math.round((baseMeasure * gapYPercent) / 100)
+  const stepX = Math.max(1, targetWidth + gapX)
+  const stepY = Math.max(1, targetHeight + gapY)
+  const rotationPadding = Math.ceil(Math.hypot(targetWidth, targetHeight))
+  const startX = -stepX - rotationPadding
+  const endX = outputWidth + stepX + rotationPadding
+  const startY = -stepY - rotationPadding
+  const endY = outputHeight + stepY + rotationPadding
+
+  for (let y = startY; y <= endY; y += stepY) {
+    for (let x = startX; x <= endX; x += stepX) {
+      renderWatermark({
+        angleDegrees,
+        colorMode,
+        context,
+        height: targetHeight,
+        opacityPercent,
+        watermarkColor,
+        watermarkImage,
+        width: targetWidth,
+        x,
+        y,
+      })
+    }
+  }
+}
+
 const drawComposition = ({
+  angleDegrees,
   canvas,
   colorMode,
   marginPercent,
   opacityPercent,
   outputHeight,
   outputWidth,
-  photoImage,
+  patternGapXPercent,
+  patternGapYPercent,
+  sourceMedia,
   position,
   sizePercent,
+  watermarkMode,
   watermarkColor,
   watermarkImage,
 }: {
+  angleDegrees: number
   canvas: HTMLCanvasElement
   colorMode: ColorMode
   marginPercent: number
   opacityPercent: number
   outputHeight: number
   outputWidth: number
-  photoImage: HTMLImageElement
+  patternGapXPercent: number
+  patternGapYPercent: number
+  sourceMedia: CanvasImageSource
   position: Position
   sizePercent: number
+  watermarkMode: WatermarkMode
   watermarkColor: string
   watermarkImage: HTMLImageElement | null
 }) => {
@@ -180,13 +249,32 @@ const drawComposition = ({
   canvas.height = outputHeight
 
   context.clearRect(0, 0, outputWidth, outputHeight)
-  context.drawImage(photoImage, 0, 0, outputWidth, outputHeight)
+  context.drawImage(sourceMedia, 0, 0, outputWidth, outputHeight)
 
   if (!watermarkImage) return
 
   const targetWidth = Math.round((outputWidth * sizePercent) / 100)
   const ratio = watermarkImage.naturalHeight / watermarkImage.naturalWidth
   const targetHeight = Math.max(1, Math.round(targetWidth * ratio))
+
+  if (watermarkMode === 'pattern') {
+    renderWatermarkPattern({
+      angleDegrees,
+      colorMode,
+      context,
+      gapXPercent: patternGapXPercent,
+      gapYPercent: patternGapYPercent,
+      opacityPercent,
+      outputHeight,
+      outputWidth,
+      targetHeight,
+      targetWidth,
+      watermarkColor,
+      watermarkImage,
+    })
+    return
+  }
+
   const { x, y } = getWatermarkPlacement(
     position,
     marginPercent,
@@ -210,12 +298,16 @@ const drawComposition = ({
 }
 
 function App() {
-  const [photoAsset, setPhotoAsset] = useState<LoadedAsset | null>(null)
-  const [watermarkAsset, setWatermarkAsset] = useState<LoadedAsset | null>(null)
+  const [photoAsset, setPhotoAsset] = useState<LoadedImageAsset | null>(null)
+  const [watermarkAsset, setWatermarkAsset] = useState<LoadedImageAsset | null>(null)
+  const [watermarkMode, setWatermarkMode] = useState<WatermarkMode>('single')
   const [position, setPosition] = useState<Position>('bottom-right')
   const [sizePercent, setSizePercent] = useState(22)
   const [opacityPercent, setOpacityPercent] = useState(45)
   const [marginPercent, setMarginPercent] = useState(4)
+  const [angleDegrees, setAngleDegrees] = useState(-25)
+  const [patternGapXPercent, setPatternGapXPercent] = useState(12)
+  const [patternGapYPercent, setPatternGapYPercent] = useState(10)
   const [colorMode, setColorMode] = useState<ColorMode>('original')
   const [watermarkColor, setWatermarkColor] = useState('#ffffff')
   const [error, setError] = useState('')
@@ -231,8 +323,8 @@ function App() {
 
   useEffect(() => {
     const hydrateAsset = async (
-      asset: LoadedAsset | null,
-      setter: (value: LoadedAsset | null) => void,
+      asset: LoadedImageAsset | null,
+      setter: (value: LoadedImageAsset | null) => void,
     ) => {
       if (!asset || asset.image) return
 
@@ -261,15 +353,19 @@ function App() {
     )
 
     drawComposition({
+      angleDegrees,
       canvas,
       colorMode,
       marginPercent,
       opacityPercent,
       outputHeight: height,
       outputWidth: width,
-      photoImage: photoAsset.image,
+      patternGapXPercent,
+      patternGapYPercent,
+      sourceMedia: photoAsset.image,
       position,
       sizePercent,
+      watermarkMode,
       watermarkColor,
       watermarkImage: watermarkAsset?.image ?? null,
     })
@@ -280,18 +376,22 @@ function App() {
     sizePercent,
     opacityPercent,
     marginPercent,
+    angleDegrees,
+    patternGapXPercent,
+    patternGapYPercent,
+    watermarkMode,
     colorMode,
     watermarkColor,
   ])
 
   const updateAsset = (
     file: File | undefined,
-    currentAsset: LoadedAsset | null,
-    setter: (value: LoadedAsset | null) => void,
+    currentAsset: LoadedImageAsset | null,
+    setter: (value: LoadedImageAsset | null) => void,
   ) => {
     if (!file) return
     if (currentAsset) URL.revokeObjectURL(currentAsset.url)
-    setter(createAsset(file))
+    setter(createImageAsset(file))
   }
 
   const handleDownload = async () => {
@@ -304,15 +404,19 @@ function App() {
       const mimeType = getMimeType(photoAsset.file)
 
       drawComposition({
+        angleDegrees,
         canvas,
         colorMode,
         marginPercent,
         opacityPercent,
         outputHeight: photoAsset.image.naturalHeight,
         outputWidth: photoAsset.image.naturalWidth,
-        photoImage: photoAsset.image,
+        patternGapXPercent,
+        patternGapYPercent,
+        sourceMedia: photoAsset.image,
         position,
         sizePercent,
+        watermarkMode,
         watermarkColor,
         watermarkImage: watermarkAsset?.image ?? null,
       })
@@ -398,9 +502,23 @@ function App() {
             <h2>Ajustes</h2>
 
             <label className="field">
+              <span>Modo de marca</span>
+              <select
+                value={watermarkMode}
+                onChange={(event) =>
+                  setWatermarkMode(event.target.value as WatermarkMode)
+                }
+              >
+                <option value="single">Una sola marca</option>
+                <option value="pattern">Repetir por toda la foto</option>
+              </select>
+            </label>
+
+            <label className="field">
               <span>Posición</span>
               <select
                 value={position}
+                disabled={watermarkMode === 'pattern'}
                 onChange={(event) => setPosition(event.target.value as Position)}
               >
                 {positions.map((item) => (
@@ -442,7 +560,48 @@ function App() {
                 min="0"
                 max="12"
                 value={marginPercent}
+                disabled={watermarkMode === 'pattern'}
                 onChange={(event) => setMarginPercent(Number(event.target.value))}
+              />
+            </label>
+
+            <label className="field">
+              <span>Ángulo del patrón: {angleDegrees}°</span>
+              <input
+                type="range"
+                min="-90"
+                max="90"
+                value={angleDegrees}
+                disabled={watermarkMode !== 'pattern'}
+                onChange={(event) => setAngleDegrees(Number(event.target.value))}
+              />
+            </label>
+
+            <label className="field">
+              <span>Distancia horizontal: {patternGapXPercent}%</span>
+              <input
+                type="range"
+                min="0"
+                max="40"
+                value={patternGapXPercent}
+                disabled={watermarkMode !== 'pattern'}
+                onChange={(event) =>
+                  setPatternGapXPercent(Number(event.target.value))
+                }
+              />
+            </label>
+
+            <label className="field">
+              <span>Distancia vertical: {patternGapYPercent}%</span>
+              <input
+                type="range"
+                min="0"
+                max="40"
+                value={patternGapYPercent}
+                disabled={watermarkMode !== 'pattern'}
+                onChange={(event) =>
+                  setPatternGapYPercent(Number(event.target.value))
+                }
               />
             </label>
 
