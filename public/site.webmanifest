@@ -1,0 +1,16 @@
+{
+  "name": "Watermark - marca de agua online",
+  "short_name": "Watermark",
+  "description": "Agrega marcas de agua a tus fotos desde el navegador y descarga en resolución original.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f0e8",
+  "theme_color": "#0f8b8d",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

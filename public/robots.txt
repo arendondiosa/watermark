@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://watermark.rendon.co/sitemap.xml

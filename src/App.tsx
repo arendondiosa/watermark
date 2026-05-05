@@ -453,12 +453,12 @@ function App() {
     <main className="app-shell">
       <section className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Marca de agua sin perder resolución</p>
-          <h1>Sube tu foto, aplica la marca y descarga el resultado final.</h1>
+          <p className="eyebrow">Marca de agua online sin perder resolución</p>
+          <h1>Marca de agua online gratis para fotos</h1>
           <p className="lead">
-            Carga una imagen base y una imagen para la marca de agua, ajusta
-            posición, tamaño, color y opacidad, y descarga el archivo con las
-            dimensiones originales.
+            Sube una imagen base y un logo o sello, ajusta posición, tamaño,
+            color y opacidad, y descarga el archivo final con las dimensiones
+            originales directamente desde tu navegador.
           </p>
         </div>
       </section>
@@ -666,6 +666,44 @@ function App() {
             )}
           </div>
         </section>
+      </section>
+
+      <section className="seo-content" aria-labelledby="seo-title">
+        <div>
+          <p className="eyebrow seo-eyebrow">Protege tus fotos en segundos</p>
+          <h2 id="seo-title">Herramienta para poner marca de agua a imágenes</h2>
+          <p>
+            Watermark te permite agregar una marca de agua a fotos, diseños,
+            capturas y piezas comerciales sin instalar programas. Todo el
+            proceso ocurre en el navegador: eliges la imagen principal, subes tu
+            logo, firma o sello, revisas la vista previa y descargas el
+            resultado en alta calidad.
+          </p>
+        </div>
+
+        <div className="seo-grid">
+          <article>
+            <h3>Marca única o repetida</h3>
+            <p>
+              Coloca una marca en una esquina, en el centro o repítela como
+              patrón para proteger catálogos, portafolios y publicaciones.
+            </p>
+          </article>
+          <article>
+            <h3>Control visual preciso</h3>
+            <p>
+              Ajusta tamaño, margen, opacidad, color y ángulo para que la marca
+              de agua sea visible sin arruinar la imagen original.
+            </p>
+          </article>
+          <article>
+            <h3>Privado y rápido</h3>
+            <p>
+              Las imágenes se procesan localmente en tu dispositivo, con vista
+              previa en tiempo real y descarga en la resolución original.
+            </p>
+          </article>
+        </div>
       </section>
     </main>
   )
